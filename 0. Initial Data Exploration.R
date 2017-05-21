@@ -75,12 +75,13 @@ trainset$Keyword_ID_100 = trainset$Keyword_ID/1000
 trainset$Keyword_ID_last5 = str_sub(trainset$Keyword_ID, start = -6, end = -1)
 
 
-length(unique(trainset$Keyword_ID)) #47363
-length(unique(trainset$Ad_group_ID)) #35323
-length(unique(trainset$Campaign_ID)) #1517
-length(unique(trainset$Account_ID)) #16
-length(unique(trainset$Device_ID)) #3
-length(unique(trainset$Match_type_ID)) #3
+#check levels (on 100k subset + 8.3M training set)
+length(unique(train$Keyword_ID)) #47363, 487981
+length(unique(train$Ad_group_ID)) #35323, 269480
+length(unique(train$Campaign_ID)) #1517, 2927
+length(unique(train$Account_ID)) #16, 16
+length(unique(train$Device_ID)) #3,3
+length(unique(train$Match_type_ID)) #3,3
 
 
 sort(table(train$Date))
@@ -102,6 +103,7 @@ x
 
 ### Graphs:
 
+## 1.0 Revenue
 #Revenue per Month (sum)
 ggplot(data = train, 
        aes(year.month, Revenue)) + 
@@ -138,7 +140,7 @@ ggplot(data = train,
   stat_summary(fun.y = mean, geom = "bar") + labs(x = "Match ID", y = "Revenue (mean)")
 
 
-
+##2.0 Clicks
 #Clicks per Month (sum)
 ggplot(data = train, 
         aes(year.month, Clicks)) + 
@@ -148,20 +150,18 @@ ggplot(data = train,
        aes(year.month, Clicks)) + 
   stat_summary(fun.y = mean, geom = "bar")
 
-
+##3.0 RPC
 #RPC per Month(sum)
 #RPC per Month(mean)
 
 
+##4.0 Bookings
+ggplot(data = train, 
+       aes(year.month, booking)) + 
+  stat_summary(fun.y = mean, geom = "bar") + labs(x = "Month", y = "Number of Bookings (mean)")
 
 
-
-
-
-
-scale_x_date(
-    labels = date_format("%Y-%m"),
-    breaks = "1 month") # custom x-axis labels
+##5.0 Conversions
 
 
 ## Data Prep
