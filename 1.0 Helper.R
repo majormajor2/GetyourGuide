@@ -10,7 +10,7 @@ performance_measure = function (data, lev = NULL, model =NULL){
   out
 }
 
-
+#simpler error function
 rpce = function(preds, obs, clicks) {
   rpce = sum(clicks*((obs - preds)^2))/sum(clicks)
   return(rpce)

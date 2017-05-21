@@ -13,6 +13,7 @@ library(doParallel)
 library(stringr)
 library(dplyr)
 if(!require("lubridate")) install.packages("lubridate"); library("lubridate") 
+library(zoo)
 
 
 #Data Structure
@@ -21,22 +22,22 @@ summary(train$Revenue)
 summary(train$Clicks)
 
 #Revenue per Click i.e. RPC
-train_$rpc = train$Revenue/train$Clicks
+train$rpc = train$Revenue/train$Clicks
 summary(train_subset$rpc)
 
 
 #Take a stratified sample of the data to create a subset
 set.seed(123)
 idx_1 = createDataPartition(y = train$rpc, p = 0.012, list = FALSE)
-train_subset = train[idx_1,]
+train = train[idx_1,]
 #rm(train)
 #rm(idx_1)
 
 #Split into training and test sets to check variable importance
 set.seed(124)
-idx_2 = createDataPartition(y = train_subset$rpc, p = 0.7, list = FALSE)
-trainset = train_subset[idx_2,]
-testset = train_subset[-idx_2,]
+idx_2 = createDataPartition(y = train$rpc, p = 0.7, list = FALSE)
+trainset = train[idx_2,]
+testset = train[-idx_2,]
 
 
 #Pre-Model clean trainset
@@ -83,7 +84,7 @@ length(unique(trainset$Match_type_ID)) #3
 
 
 sort(table(train$Date))
-sum(train[train$Date == "2014-12-23","Clicks"]) 
+sum(train[train$year.month == "Jan 2015","Clicks"]) 
 sum(train[train$Date == "2014-12-23","revenue"]) 
 str(train)
 date = unique(train$Date)
@@ -97,14 +98,74 @@ table(trainset$month, sum(trainset$rpc))
 x = tbl_df(summarise(group_by(trainset, month), rpc = mean(Clicks))) 
 x
 
+
+
+### Graphs:
+
+#Revenue per Month (sum)
+ggplot(data = train, 
+       aes(year.month, Revenue)) + 
+        stat_summary(fun.y = sum, geom = "bar")
+
+#Revenue per Month (mean)
+ggplot(data = train, 
+       aes(year.month, Revenue)) + 
+        stat_summary(fun.y = mean, geom = "bar") + labs(x = "Month", y = "Revenue (mean)")
+
+#Revenue per DOTM (mean)
+ggplot(data = train, 
+       aes(day.of.the.month, Revenue)) + 
+  stat_summary(fun.y = mean, geom = "bar") + labs(x = "DOTM", y = "Revenue (mean)")
+
+#Revenue per DOTW (mean)
+ggplot(data = train, 
+       aes(weekday, Revenue)) + 
+  stat_summary(fun.y = mean, geom = "bar") + labs(x = "Weekday", y = "Revenue (mean)")
+
+#Revenue per Account (mean)
+ggplot(data = train, 
+       aes(Account_ID, Revenue)) + 
+  stat_summary(fun.y = mean, geom = "bar") + labs(x = "Account", y = "Revenue (mean)")
+
+#Revenue per Device (mean)
+ggplot(data = train, 
+       aes(Device_ID, Revenue)) + 
+  stat_summary(fun.y = mean, geom = "bar") + labs(x = "Device", y = "Revenue (mean)")
+
+#Revenue per Match (mean)
+ggplot(data = train, 
+       aes(Match_type_ID, Revenue)) + 
+  stat_summary(fun.y = mean, geom = "bar") + labs(x = "Match ID", y = "Revenue (mean)")
+
+
+
+#Clicks per Month (sum)
+ggplot(data = train, 
+        aes(year.month, Clicks)) + 
+          stat_summary(fun.y = sum, geom = "bar")
+#Clicks per Month (mean)  
+ggplot(data = train, 
+       aes(year.month, Clicks)) + 
+  stat_summary(fun.y = mean, geom = "bar")
+
+
+#RPC per Month(sum)
+#RPC per Month(mean)
+
+
+
+
+
+
+
+
+scale_x_date(
+    labels = date_format("%Y-%m"),
+    breaks = "1 month") # custom x-axis labels
+
+
 ## Data Prep
 # Outlier treatment for revenue
-##FE
-# Start with factorizing Accounts, Devices and Matches
-# Interaction terms:Account-Device, Account-Match, Match-Device, Account-Match-Device
-# Replace: Keywords, Ad_group and Campaign with 1) WOE 2) Prob of success (variations by time frame)
-# Seasonality Analysis: Month, Week, Day of the Week, Day of the Month
-# Predicted Features: Click, Conversion, Revenue
 
 
 
