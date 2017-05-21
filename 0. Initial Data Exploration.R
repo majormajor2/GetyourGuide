@@ -96,10 +96,10 @@ date = unique(train$Date)
 trainset$month = month(x = trainset$Date)
 trainset$month = as.factor(trainset$month)
 table(trainset$month, sum(trainset$rpc))
-x = tbl_df(summarise(group_by(trainset, month), rpc = mean(Clicks))) 
+x = tbl_df(summarise(group_by(train, day.of.the.month), rpc = length(unique(train$Ad_group_ID))))
 x
 
-
+length(unique(train[train$Date == "2014-12-14", "Ad_group_ID"]))
 
 ### Graphs:
 
@@ -164,8 +164,9 @@ ggplot(data = train,
 ##5.0 Conversions
 
 
-## Data Prep
-# Outlier treatment for revenue
+ggplot(train[which(train$Revenue>0),], aes(x=Revenue)) + geom_histogram()
+ggplot(train, aes(x=log.rpc)) + geom_histogram()
+
 
 
 
