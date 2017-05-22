@@ -1,0 +1,121 @@
+
+AUTHOR: Hamayun Khan
+
+GetYourGuide
+  Goal: Suggest a set of features that will help predict Revenue per Click (RPC)
+
+Contents
+  1. Data Exploration
+  2. Feature Creation
+  3. Feature Selection
+  4. Conclusion 
+  5. Next Steps
+  
+
+1. Data Exploration
+
+```{r}
+str(train)
+```
+
+The train set consists of roughly 8.3 million observations of 10 variables, which can be divided into three categories: 
+1.1 Dates
+1.2 Factors 
+1.3 Performance Metrics (not available in the Prediction Set) 
+
+1. We have from 5 months i.e. Dec 2014, Jan-April 2015. In order to better capture the impact of time, we can transform the date variable into weeks, weekdays and months. These are helpful in understanding the differences across the Factors as well as the Performance Metrics. For instance, the 5th day of the week has the highest average revenue.
+
+```{r}
+ggplot(data = train, 
+       aes(weekday, Revenue)) + 
+  stat_summary(fun.y = mean, geom = "bar") + labs(x = "Weekday", y = "Revenue (mean)")
+```
+
+
+1.2 There are 487,981 unique Keywords, 269,480 unique Ad Groups, 2,927 unique Campaigns and 16 unique Accounts. I marked these variables, along with Devide and Match type, as Factors. (See "3.0 Main.R")
+While the number of factor levels for Accounts, Device and Match type are relatively low, the others are very high and are likely to be more informative if they are treated (to be discussed later)
+
+
+1.3 Performance metrics include Revenue, Clicks and Conversions which are given. RPC is the target variable and is calculated as Revenue/Clciks. It follows a heavily skewed distribution (around 0), however there are also some very high values.  
+
+```{r}
+summary(train$rpc)
+```
+
+```{r}
+ggplot(data = train, 
+       aes(year.month, rpc)) + 
+  stat_summary(fun.y = mean, geom = "bar") + labs(x = "Month", y = "rpc (mean)")
+```
+
+In order to address the high values, I suggest using a log transformation. The high number of 0's in the dataset pose a problem, however, using the log(x + 1) transformation does the trick. The target variable can be de-transformed after prediction using the exponential function i.e. exp(x)-1.
+
+```{r}
+summary(train$log.rpc)
+```
+
+```{r}
+ggplot(data = train, 
+       aes(year.month, log.rpc)) + 
+  stat_summary(fun.y = mean, geom = "bar") + labs(x = "Month", y = "log.rpc (mean)")
+```
+
+
+Looking at a correlation plot, we can see that xyz will be important predictors of RPC.
+
+
+Comments:
+
+
+
+
+Guiding Principles
+
+- a
+- b
+- c
+
+
+Comments:
+
+
+Feature Creation
+
+- a
+- b
+- c
+
+
+Comments:
+
+
+Feature Selection
+
+
+Data Exploration
+
+- a
+- b
+- c
+
+Comments:
+
+
+Conclusion
+
+
+- a
+- b
+- c
+
+
+Next Steps
+
+- a
+- b
+- c
+
+
+
+
+

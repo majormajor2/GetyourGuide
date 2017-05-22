@@ -1,3 +1,12 @@
+library(caret)
+library(doParallel)
+library(stringr)
+library(dplyr)
+if(!require("lubridate")) install.packages("lubridate"); library("lubridate") 
+library(zoo)
+if(!require("tikzDevice")) install.packages("tikzDevice"); library("tikzDevice") 
+require(tikzDevice)
+
 #Define performance measure
 performance_measure = function (data, lev = NULL, model =NULL){
   
@@ -18,70 +27,8 @@ rpce = function(preds, obs, clicks) {
 
 
 
-lastObservation <- function(dat.fr){
-  #Computes the days since the last observation for each Ad_group
-  #
-  #Args:
-  #   dat.fr: a data frame with Ad_group column (train,prediction)
-  #   
-  #
-  #Returns:
-  #   A data table with lineID and days since last observation
-  
-  if (!require("doSNOW")) install.packages("doSNOW")
-  if (!require("doParallel")) install.packages("doParallel")
-  if (!require("tcltk")) install.packages("tcltk")
-  if (!require("data.table")) install.packages("data.table")
-  
-  library(data.table)
-  library(doSNOW)
-  library(tcltk)
-  library(doParallel)
-  
-  dat.fr <- data.table(dat.fr)
-  dat.fr <- dat.fr[order(Ad_group_ID, lineID),]
-  dat.fr[,count:=1]
-  help <- dat.fr[,sum(count),by=Ad_group_ID]
-  nr.Ad_group_ID <- dim(help)[1]
-  
-  cores <- detectCores()-1
-  cl <- makeSOCKcluster(cores)
-  registerDoSNOW(cl)
-  
-  pb <- txtProgressBar(max=nr.Ad_group_ID, style=3)
-  progress <- function(n) setTxtProgressBar(pb, n)
-  opts <- list(progress=progress)
-  
-  x <- foreach(i=1:nr.Ad_group_ID,.options.snow=opts,.combine = 'c') %dopar% {
-    
-    end <- sum(help$V1[c(1:i)])
-    len <- help$V1[i]
-    vec <- rep(0,len)
-    
-    cnt <- 1  
-    
-    last <- 0
-    for(j in c((end-len+1):end)){
-      if(j==(end-len+1)){
-        vec[cnt] <- 0
-      } else {
-        vec[cnt] <- (dat.fr$day[j]-last)
-      }
-      cnt <- cnt+1
-      last <- dat.fr$day[j]
-    }
-    vec
-  }
-  stopCluster(cl)
-  output <- data.table(cbind(dat.fr$lineID,x))
-  names(output) <- c("lineID","lastObservation")
-  return(output)
-}
-
-
-
-## This function calculates and returns the distance of every row in the data set to the k closest cases THAT WERE ORDERS ##
-## Might give additional information of the similarity of every case with other successful (order) cases ##
+## This function calculates and returns the distance of every row in the data set to the k closest cases that were bookings ##
+## Gives additional information on the similarity of every case with other successful (booking) cases ##
 ## Three return values currently implemented (can be expanded easily), to be specified in "type" argument:
 ##      1. "average" : average of all distances to k specified neighbors
 ##      2. "sum"     : sum of the distances to k specified neighbors
@@ -94,53 +41,65 @@ lastObservation <- function(dat.fr){
 
 if(!require("FNN")) install.packages("FNN"); library("FNN")
 
-get_dist <- function(trainSet, predSet, k, type = "average"){
+get_dist = function(trainSet, predSet, k, type = "average"){
   
   
-  trainSet_idx_numeric <- sapply(trainSet, is.numeric)  # filter numerical variables
-  trainSet_numeric <- trainSet[,trainSet_idx_numeric]
-  trainSet_numeric <- as.data.frame(lapply(trainSet_numeric, standardize1))
-  trainSet_numeric$order <- trainSet$order            # attach order variable (since dependent)
+  trainSet_idx_numeric = sapply(trainSet, is.numeric)  # filter numerical variables
+  trainSet_numeric = trainSet[,trainSet_idx_numeric]
+  trainSet_numeric = as.data.frame(lapply(trainSet_numeric, standardize1))
+  trainSet_numeric$booking = trainSet$booking            # attach booking variable (since dependent)
   
-  trainSet_numeric <- trainSet_numeric[,-which(colnames(trainSet_numeric) == "rpc")]  # take out revenue since not in class set
+  trainSet_numeric = trainSet_numeric[,-which(colnames(trainSet_numeric) == c("rpc","log.rpc","Clicks","Conversions","Revenue"))]  # take out since not in Prediction
   
   if(!identical(trainSet, predSet)){
-    predSet_idx_numeric <- sapply(predSet, is.numeric)  # filter numerical variables
-    predSet_numeric <- predSet[,predSet_idx_numeric]
-    predSet_numeric <- as.data.frame(lapply(predSet_numeric, standardize1))
+    predSet_idx_numeric = sapply(predSet, is.numeric)  # filter numerical variables
+    predSet_numeric = predSet[,predSet_idx_numeric]
+    predSet_numeric = as.data.frame(lapply(predSet_numeric, standardize1))
     
-    if(any(colnames(predSet) == "order")){
-      predSet_numeric$order <- predSet$order  
+    if(any(colnames(predSet) == "booking")){
+      predSet_numeric$booking = predSet$booking  
     }
     
     if(any(colnames(predSet) == "rpc")){
-      predSet_numeric <- predSet_numeric[,-which(colnames(predSet_numeric) == "revenue")]
+      predSet_numeric = predSet_numeric[,-which(colnames(predSet_numeric) == "rpc")]
+    }
+    if(any(colnames(predSet) == "log.rpc")){
+      predSet_numeric = predSet_numeric[,-which(colnames(predSet_numeric) == "log.rpc")]
+    }
+    if(any(colnames(predSet) == "Revenue")){
+      predSet_numeric = predSet_numeric[,-which(colnames(predSet_numeric) == "Revenue")]
+    }
+    if(any(colnames(predSet) == "Clicks")){
+      predSet_numeric = predSet_numeric[,-which(colnames(predSet_numeric) == "Clicks")]
+    }
+    if(any(colnames(predSet) == "Conversions")){
+      predSet_numeric = predSet_numeric[,-which(colnames(predSet_numeric) == "Conversions")]
     }
     
   }else{
-    predSet_numeric <- trainSet_numeric
+    predSet_numeric = trainSet_numeric
   }
   
-  par.nn <- k
+  par.nn = k
   
   print("start modelling")
   
-  nn.list <- get.knnx(data = trainSet_numeric[which(trainSet_numeric$order == 1),-c(which(colnames(trainSet_numeric) == "order"), which(colnames(trainSet_numeric) == "lineID"))], query = predSet_numeric[,-c(which(colnames(predSet_numeric) == "order"), which(colnames(predSet_numeric) == "lineID"))], k = par.nn)
+  nn.list = get.knnx(data = trainSet_numeric[which(trainSet_numeric$booking == 1),-c(which(colnames(trainSet_numeric) == "booking"))], query = predSet_numeric[,-c(which(colnames(predSet_numeric) == "booking"))], k = par.nn)
   
   ### depending on "type" calculate the required distance(s) and return
   
   if(type == "average"){
-    avgDistance <- apply(as.data.frame(nn.list[2]), 1, function(x){mean(x)})
+    avgDistance = apply(as.data.frame(nn.list[2]), 1, function(x){mean(x)})
     return(avgDistance)
   }
   
   if(type == "all"){
-    distances <- as.data.frame(nn.list[2])
+    distances = as.data.frame(nn.list[2])
     return(distances)
   }
   
   if(type == "sum"){
-    sumDistance <- apply(as.data.frame(nn.list[2]), 1, function(x){sum(x)})
+    sumDistance = apply(as.data.frame(nn.list[2]), 1, function(x){sum(x)})
     return(sumDistance)
   }
   
@@ -188,7 +147,7 @@ check_new_levels = function(train, prediction, target = "booking")
 }
 
 ## Weight of Evidence
-calculate_woe = function(train, target = "log.rpc", columns_to_replace = c("Keyword_ID","Ad_group_ID","Campaign_ID"))
+calculate_woe = function(train, target = "booking", columns_to_replace = c("Keyword_ID","Ad_group_ID","Campaign_ID"))
 {
   woe_object = woe(as.formula(paste(target, paste(columns_to_replace, collapse="+"), sep = "~")), data = train, zeroadj = 0.5)
   return(woe_object)
@@ -207,7 +166,7 @@ apply_woe = function(dataset, woeobject = woe_object, doReplace = TRUE)
   return(dataset_woe)
 }
 
-
+#Remove redundant factor levels
 remove_new_levels  = function(prediction)
   {
   prediction$Keyword_ID = factor(prediction$Keyword_ID)
@@ -216,8 +175,68 @@ remove_new_levels  = function(prediction)
   return(prediction)
 }
 
+data_setup = function(dataset)
+  {
+  #1.0 Factorizing Accounts, Devices & Matches etc
+  dataset$Account_ID = as.factor(dataset$Account_ID)
+  dataset$Device_ID = as.factor(dataset$Device_ID)
+  dataset$Match_type_ID = as.factor(dataset$Match_type_ID)
+  dataset$Keyword_ID = as.factor(dataset$Keyword_ID)
+  dataset$Ad_group_ID = as.factor(dataset$Ad_group_ID)
+  dataset$Campaign_ID = as.factor(dataset$Campaign_ID)
+  #2.0 Interaction Terms
+  #Create interaction terms
+  dataset$Account_Device = paste(dataset$Account_ID, dataset$Device_ID)
+  dataset$Account_Match = paste(dataset$Account_ID, dataset$Match_type_ID)
+  dataset$Match_Device = paste(dataset$Match_type_ID, dataset$Device_ID)
+  #Factorize
+  dataset$Account_Match_Device = paste(dataset$Account_ID, dataset$Match_type_ID, dataset$Device_ID)
+  dataset$Account_Device = as.factor(dataset$Account_Device)
+  dataset$Account_Match = as.factor(dataset$Account_Match)
+  dataset$Match_Device = as.factor(dataset$Match_Device)
+  dataset$Account_Match_Device = as.factor(dataset$Account_Match_Device)
+  if("Revenue" %in% colnames(dataset)){
+  #Create Target Variable
+  dataset$rpc = dataset$Revenue/dataset$Clicks
+  #Create Transformed Version
+  dataset$log.rpc = log(1 + dataset$rpc)
+  # Price Paid
+  # Assumption: Each Keyword - Account - Device etc combnation refers to a unique product and so 
+  # dividing revenue by conversions gives us average price of a unique product for that day
+  dataset$price.paid = 0
+  dataset$price.paid = ifelse(dataset$Revenue == 0, 0, dataset$Revenue/dataset$Conversions)
+  
+  #Booking 
+  dataset$booking = ifelse(dataset$Revenue>0, 1,0)
+  dataset$booking = as.factor(dataset$booking)
+  }
+  return(dataset)
+}
 
 
-
+time_features = function(dataset) {
+  if(!require("lubridate")) install.packages("lubridate"); library("lubridate") 
+  if(!require("zoo")) install.packages("zoo"); library("zoo") 
+  #Dates
+  dataset$Date = as.Date(dataset$Date)
+  
+  #Dates: Month
+  dataset$month = month(x = dataset$Date)
+  dataset$month = as.factor(dataset$month)
+  
+  #Year-Month
+  dataset$year.month = format(as.Date(dataset$Date), "%Y-%m")
+  dataset$year.month = as.factor(dataset$year.month)
+  
+  #Day of the Week
+  dataset$weekday = wday(dataset$Date)
+  dataset$weekday = as.factor(dataset$weekday)
+  
+  #Day of the Month
+  dataset$day.of.the.month = day(x = dataset$Date)
+  dataset$day.of.the.month = as.factor(dataset$day.of.the.month)
+  
+  return(dataset)
+}
 
 
