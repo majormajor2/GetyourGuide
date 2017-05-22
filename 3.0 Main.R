@@ -10,8 +10,8 @@
 source("1.0 Helper.R")
 
 #Load Datasets
-train = read_csv("~/R/GetyourGuide/train.csv")
-prediction = read_csv("~/R/GetyourGuide/prediction.csv")
+train = read.csv("train.csv")
+#prediction = read.csv("~/R/GetyourGuide/prediction.csv")
 
 #Data Setup
 train = data_setup(train)
