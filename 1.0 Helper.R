@@ -240,3 +240,58 @@ time_features = function(dataset) {
 }
 
 
+
+strongly_correlated = function(dataset, threshold = 0.7)
+  
+{
+  
+  correlation_matrix = cor(dataset[, sapply(dataset, is.numeric)]) # calculate matrix only for numeric columns
+  
+  listed_variables = vector() # vector of listed variables to prevent duplication
+  
+  dropped_variables = vector()# vector of variables that will be dropped
+  
+  
+  
+  for(column in colnames(correlation_matrix))
+    
+  {
+    
+    listed_variables = append(listed_variables, column) # add column to listed variables
+    
+    # loop only over variables for which we have not calculated the correlation yet
+    
+    for(row in setdiff(row.names(correlation_matrix),listed_variables))
+      
+    {
+      
+      if(abs(correlation_matrix[row,column]) > threshold)
+        
+      {
+        
+        if(mean(abs(correlation_matrix[row,])) > mean(abs(correlation_matrix[,column])))
+          
+        {
+          
+          dropped_variables = append(dropped_variables, row)
+          
+        }
+        
+        else{dropped_variables = append(dropped_variables, column)}
+        
+      }
+      
+    }
+    
+  }
+  
+  # return unique variable names
+  
+  return(unique(dropped_variables))
+  
+}
+
+
+
+
+

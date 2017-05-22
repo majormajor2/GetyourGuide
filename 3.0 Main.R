@@ -32,7 +32,7 @@ train = calculate_woe(train)
 train = apply_woe(train)
 
 #check if there are new levels in Prediction and set them to 0
-train_factors = train_subset[,c(2:7)]
+train_factors = train[,c(2:7)]
 prediction.new.levels = check_new_levels(train = train_factors, prediction = prediction)
 
 #26189 new levels in Keywords

@@ -154,14 +154,20 @@ prediction$Revenue_feature = predict(ols, newdata = prediction)
 
 There are a number of common approaches used to address high factor levels such as Clustering, PCA, Binning. Here I consider Weight of Evidence, which is a supervised (based on the target variable) approach that converts factor variables with high levels into numeric variables.
 
-The klaR package can be used to compute the WOE Object based on the Train set and it is then applied to the Prediction set. Before it can be applied, however, we need to ensure the Prediction set does not have any new factor levels. In this case, we have:
+The klaR package can be used to compute the WOE Object based on the Train set and it is then applied to the Prediction set. Before it can be applied, however, we need to ensure the Prediction set does not have any new factor levels. 
+
+```{r}
+train_factors = train[,c(2:7)] #select factors to be checked
+prediction.new.levels = check_new_levels(train = train_factors, prediction = prediction)
+```
+
+In this case, we have:
   
   - 26,189 new levels in Keywords
   - 17,995 new levels in Ad_Groups
   - 33 new levels in Campaigns
 
 Ideally, we should compare the new levels to the existing ones and come up with an imputation strategy. However, here I choose to index the new levels and set them to zero as I believe the improvement in predictive power somewhat justifies the loss of information.
-
 
 
 2.4 Interaction Terms
@@ -182,26 +188,85 @@ Booking: Binary factor that takes value 1 when revenue is greater than 0 and 0 o
 2.6 Closest Neighbors
 
 Once all other features have been created, we can use KNN to find the distance between bookings and non-bookings.
-The function get_dist is trained on the testset as it will contain all 
+The function get_dist is trained on the testset as it will contain all the predicted features.
 ```{r}
-prediction$dist = get_dist(trainSet = testset, predSet = prediction, k = 5)
-train$dist = get_dist(trainSet = train, predSet = train, k = 5)
+prediction$dist = get_dist(trainSet = testset, predSet = prediction, k = 5) #predict distance on Prediction set
+testset$dist = get_dist(trainSet = testset, predSet = testset, k = 5)#get distance for testset
 ```
 
 
 3. Feature Selection
 
-3.1 Correlation
+A number of methods are available for selecting the final set of features. I consider the following two here:
+
+3.1 Variable Importance Plot
+We can use the variable importance provided by Caret to select the best Features, see below:
+
+```{r}
+
+```
 
 
-
-
-3.2 Variable Importance Plot
+3.2 Correlation
+Use the following function to drop new Features that are strongly correlated to each other
+```{r}
+strongly_correlated = function(dataset, threshold = 0.7)
+  
+{
+  
+  correlation_matrix = cor(dataset[, sapply(dataset, is.numeric)]) # calculate matrix only for numeric columns
+  
+  listed_variables = vector() # vector of listed variables to prevent duplication
+  
+  dropped_variables = vector()# vector of variables that will be dropped
+  
+  
+  
+  for(column in colnames(correlation_matrix))
+    
+  {
+    
+    listed_variables = append(listed_variables, column) # add column to listed variables
+    
+    # loop only over variables for which we have not calculated the correlation yet
+    
+    for(row in setdiff(row.names(correlation_matrix),listed_variables))
+      
+    {
+      
+      if(abs(correlation_matrix[row,column]) > threshold)
+        
+      {
+        
+        if(mean(abs(correlation_matrix[row,])) > mean(abs(correlation_matrix[,column])))
+          
+        {
+          
+          dropped_variables = append(dropped_variables, row)
+          
+        }
+        
+        else{dropped_variables = append(dropped_variables, column)}
+        
+      }
+      
+    }
+    
+  }
+  
+  # return unique variable names
+  
+  return(unique(dropped_variables))
+  
+}
+```
 
 
 4. Conclusion
 
-
+4.1 Exploratory analysis revealed
+4.2 
+4.3
 
 
 5. Next Steps
@@ -210,8 +275,11 @@ Here are some unfinished ideas I had about the dataset:
 
 
 5.1 Feature Creation
--  
-- 
+-  Number of Clicks/Conversions in the last Week, Month
+-  Mean number of Clicks for each Keyword when booked as a proportion of the Total Mean
+-  Percentage Price.Paid deviation in the last Week/Month
+-  Percentage deviation in Conversions in the last Week/Month
+
 
 5.2 Feature Selection
 - Recursive/Stagewise Model building to select best combination of Features
