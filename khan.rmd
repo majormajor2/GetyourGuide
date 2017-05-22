@@ -1,8 +1,37 @@
+```{r, eval=FALSE} 
+knitr::opts_chunk$set(error = TRUE)
+```
+---
+output:
+  html_document: default
+  pdf_document: default
+---
 
 AUTHOR: Hamayun Khan
 
 GetYourGuide
   Goal: Suggest a set of features that will help predict Revenue per Click (RPC)
+
+  0. Load Data
+
+```{r}
+train = read.csv("train.csv")
+library(caret)
+library(doParallel)
+library(stringr)
+if(!require("lubridate")) install.packages("lubridate"); library("lubridate") 
+library(zoo)
+if(!require("tikzDevice")) install.packages("tikzDevice"); library("tikzDevice") 
+require(tikzDevice)
+source("1.0 Helper.R")
+source("3.0 Main.R")
+set.seed(123)
+idx_1 = createDataPartition(y = train$Revenue, p = 0.05, list = FALSE)
+train = train[idx_1,]
+train = data_setup(train)
+train = time_features(train)
+
+```
 
 Contents
   1. Data Exploration
@@ -13,6 +42,7 @@ Contents
   
 
 1. Data Exploration
+
 
 ```{r}
 str(train)
@@ -119,13 +149,13 @@ First, split into training and test sets
 
 ```{r}
 set.seed(124)
-idx_2 = createDataPartition(y = train$rpc, p = 0.5, list = FALSE)
+idx_2 = createDataPartition(y = train$rpc, p = 0.05, list = FALSE)
 trainset = train[idx_2,]
 testset = train[-idx_2,]
 ```
 
 Remove unwanted columns
-```{r}
+```{r, eval=FALSE}
 trainset$booking = NULL
 trainset$log.rpc = NULL
 trainset$rpc = NULL
@@ -134,7 +164,7 @@ trainset$Clicks = NULL
 ```
 
 Enable parallel processing and train the model
-```{r}
+```{r, eval=FALSE}
 cl <- makeCluster(detectCores()-1)
 registerDoParallel(cl)
 ols = caret::train(Revenue~., method = "lm", data = trainset)
@@ -142,7 +172,7 @@ stopCluster(cl)
 ```
 
 Create Feature for testset and Prediction set
-```{r}
+```{r, eval=FALSE}
 testset$Revenue_feature = predict(lr, newdata = testset)
 prediction$Revenue_feature = predict(lr, newdata = prediction)
 ```
@@ -155,7 +185,7 @@ There are a number of common approaches used to address high factor levels such 
 
 The klaR package can be used to compute the WOE Object based on the Train set and it is then applied to the Prediction set. Before it can be applied, however, we need to ensure the Prediction set does not have any new factor levels. 
 
-```{r}
+```{r, eval=FALSE}
 train_factors = train[,c(2:7)] #select factors to be checked
 prediction.new.levels = check_new_levels(train = train_factors, prediction = prediction)
 ```
@@ -188,7 +218,7 @@ Booking: Binary factor that takes value 1 when revenue is greater than 0 and 0 o
 
 Once all other features have been created, we can use KNN to find the distance between bookings and non-bookings.
 The function get_dist is trained on the testset as it will contain all the predicted features.
-```{r}
+```{r, eval=FALSE}
 prediction$dist = get_dist(trainSet = testset, predSet = prediction, k = 5) #predict distance on Prediction set
 testset$dist = get_dist(trainSet = testset, predSet = testset, k = 5)#get distance for testset
 ```
@@ -201,14 +231,53 @@ A number of methods are available for selecting the final set of features. I con
 3.1 Variable Importance Plot
 We can use the variable importance provided by Caret to select the best Features, see below:
 
-```{r}
+```{r, eval=FALSE}
+testset$Revenue = NULL
+testset$Clicks = NULL
+testset$rpc = NULL
+testset$Conversions = NULL
+testset$booking = NULL
+testset$dist = NULL
+cl <- makeCluster(detectCores()-1)
+registerDoParallel(cl)
+time.start <- Sys.time()
+print(paste0("Model started at: ", time.start))
+ols = caret::train(log.rpc~., method = "lm", data = testset)
+time.end <- Sys.time()
+dur <- time.end-time.start
+print( dur )
+stopCluster(cl)
 varImp(ols)
 ```
+
+Print(VarImp)
+
+day.of.the.month30                                            100.00
+day.of.the.month29                                             93.79
+day.of.the.month12                                             86.84
+day.of.the.month23                                             81.22
+weekday5                                                       81.18
+Account_Match_Device341124366337 894413617560 298643508640`    77.50
+day.of.the.month27                                             72.77
+Campaign_ID                                                    64.82
+Account_Device602182847798 298643508640`                       60.32
+Account_Device412971074791 298643508640`                       59.34
+day.of.the.month10                                             58.99
+day.of.the.month26                                             58.59
+Account_Match_Device164144662657 872544605608 298643508640`    58.33
+Account_Device164144662657 298643508640`                       55.70
+day.of.the.month16                                             55.28
+Date                                                           54.85
+Account_Device575525143937 298643508640`                       54.58
+month4                                                         53.50
+month12                                                        53.09
+Account_Match_Device341124366337 872544605608 298643508640`    53.04
+
 
 
 3.2 Correlation
 Use the following function to drop new Features that are strongly correlated to each other
-```{r}
+```{r, eval=FALSE}
 strongly_correlated = function(dataset, threshold = 0.7)
   
 {
@@ -261,11 +330,11 @@ strongly_correlated = function(dataset, threshold = 0.7)
 ```
 
 
-4. Conclusion
+4. Conclusions
 
 - Exploratory Analysis hinted towards an underlying time trend. Looking at variable importance, we can see that the time features are among the best predictors of log.rpc
-- 
-- 
+- Replacing high factor levels with numeric values (using WOE) should make it easier for algorithms to identify the impact of these levels 
+- Further iterations are required optimize the feature creation process, specifically with regards to the ID columns
 
 
 5. Next Steps
