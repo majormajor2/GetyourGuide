@@ -49,8 +49,6 @@ get_dist = function(trainSet, predSet, k, type = "average"){
   trainSet_numeric = as.data.frame(lapply(trainSet_numeric, standardize1))
   trainSet_numeric$booking = trainSet$booking            # attach booking variable (since dependent)
   
-  trainSet_numeric = trainSet_numeric[,-which(colnames(trainSet_numeric) == c("rpc","log.rpc","Clicks","Conversions","Revenue"))]  # take out since not in Prediction
-  
   if(!identical(trainSet, predSet)){
     predSet_idx_numeric = sapply(predSet, is.numeric)  # filter numerical variables
     predSet_numeric = predSet[,predSet_idx_numeric]
@@ -181,9 +179,9 @@ data_setup = function(dataset)
   dataset$Account_ID = as.factor(dataset$Account_ID)
   dataset$Device_ID = as.factor(dataset$Device_ID)
   dataset$Match_type_ID = as.factor(dataset$Match_type_ID)
-  dataset$Keyword_ID = as.factor(dataset$Keyword_ID)
-  dataset$Ad_group_ID = as.factor(dataset$Ad_group_ID)
-  dataset$Campaign_ID = as.factor(dataset$Campaign_ID)
+  #dataset$Keyword_ID = as.factor(dataset$Keyword_ID)
+  #dataset$Ad_group_ID = as.factor(dataset$Ad_group_ID)
+  #dataset$Campaign_ID = as.factor(dataset$Campaign_ID)
   #2.0 Interaction Terms
   #Create interaction terms
   dataset$Account_Device = paste(dataset$Account_ID, dataset$Device_ID)

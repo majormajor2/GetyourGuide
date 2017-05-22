@@ -83,7 +83,6 @@ Data Exploration: Concluding Thoughts
  - Address high factor levels in Keywords, Ad Groups and Campaigns
 
 
-
 2. Feature Creation
 
 2.1 Time Trend
@@ -111,7 +110,7 @@ summary(train$day.of.the.month)
 
 2.2 Performance Metrics
 
-I used a linear model to predict Clicks, Revenue, Conversions and Bookings. The idea is to create reliable estimates of these variables using a portion for of the Train set (let's call it Train-1) and predict these variables for the remaining Train set (let's call it Train-2) as well as the Prediction set. These estimates can then be used as features for a model trained on Train-2 which predicts our Prediction set.
+I used a simple linear model to predict Clicks, Revenue, Conversions and logistic model Bookings (since its a binary variable). The idea is to create reliable estimates of these variables using a portion for of the Train set (let's call it Train-1) and predict these variables for the remaining Train set (let's call it Train-2) as well as the Prediction set. These estimates can then be used as features for a model trained on Train-2 which predicts our Prediction set.
 
 e.g. see below for a prediction of revenue
 
@@ -144,8 +143,8 @@ stopCluster(cl)
 
 Create Feature for testset and Prediction set
 ```{r}
-testset$Revenue_feature = predict(ols, newdata = testset)
-prediction$Revenue_feature = predict(ols, newdata = prediction)
+testset$Revenue_feature = predict(lr, newdata = testset)
+prediction$Revenue_feature = predict(lr, newdata = prediction)
 ```
 
 
@@ -203,7 +202,7 @@ A number of methods are available for selecting the final set of features. I con
 We can use the variable importance provided by Caret to select the best Features, see below:
 
 ```{r}
-
+varImp(ols)
 ```
 
 
@@ -264,9 +263,9 @@ strongly_correlated = function(dataset, threshold = 0.7)
 
 4. Conclusion
 
-4.1 Exploratory analysis revealed
-4.2 
-4.3
+- Exploratory Analysis hinted towards an underlying time trend. Looking at variable importance, we can see that the time features are among the best predictors of log.rpc
+- 
+- 
 
 
 5. Next Steps
@@ -285,6 +284,6 @@ Here are some unfinished ideas I had about the dataset:
 - Recursive/Stagewise Model building to select best combination of Features
 
 
-
+Thank you for your time!
 
 

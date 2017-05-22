@@ -19,7 +19,7 @@ prediction = data_setup(prediction)
 
 #Time Features
 train = time_features(train)
-prediction = time_features(train)
+prediction = time_features(prediction)
 
 #Data Exploration
 par(mar=c(1,1,1,1)) # to make sure the plot works on a small screen
@@ -74,14 +74,95 @@ train = calculate_woe(train = train_woe)
 prediction = apply_woe(prediction_woe)
 
 #Predicted Features
-train = predicted_features(train)
-prediction = predicted_features(prediction)
+#revenue
+
+#split dataset
+set.seed(124)
+idx_2 = createDataPartition(y = train$rpc, p = 0.7, list = FALSE)
+trainset = train[idx_2,]
+testset = train[-idx_2,]
+
+#clean trainset
+trainset$rpc = NULL
+trainset$booking = NULL
+trainset$Clicks = NULL
+trainset$Conversions = NULL
+
+
+#Enable parallel processing
+cl <- makeCluster(detectCores()-1)
+registerDoParallel(cl)
+time.start <- Sys.time()
+print(paste0("Model started at: ", time.start))
+
+ols = caret::train(Revenue~., method = "lm", data = trainset)
+
+time.end <- Sys.time()
+dur <- time.end-time.start
+print( dur )
+stopCluster(cl)
+
+#Create feature for testset and Prediction
+
+testset$Revenue_feature = predict(ols, newdata = testset)
+prediction$Revenue_feature = predict(ols, newdata = prediction)
+
 
 #K-Nearest Neighbors
-prediction$dist = get_dist(trainSet = train, predSet = prediction, k = 5)
-train$dist = get_dist(trainSet = train, predSet = train, k = 5)
+testset_dist = testset[,-c(17:19)]
+
+prediction$dist = get_dist(trainSet = testset, predSet = prediction, k = 5)
+testset$dist = get_dist(trainSet = testset_dist, predSet = testset_dist, k = 5)
 
 #Feature Importance
+
+#remove unwanted variables
+testset$Revenue = NULL
+testset$Clicks = NULL
+testset$rpc = NULL
+testset$Conversions = NULL
+testset$booking = NULL
+#testset$dist = NULL
+
+#Run Linear Model
+cl <- makeCluster(detectCores()-1)
+registerDoParallel(cl)
+time.start <- Sys.time()
+print(paste0("Model started at: ", time.start))
+
+ols = caret::train(log.rpc~., method = "lm", data = testset)
+
+time.end <- Sys.time()
+dur <- time.end-time.start
+print( dur )
+stopCluster(cl)
+
+
+
+#Which variables are important?
+library(caret)
+plot(varImp(ols, scale = FALSE))
+
+
+
+#Which can we drop?
+# calculate correlation matrix
+# exclude main variables
+testset_temp = testset
+# find variables that are strongly correlated
+strongly_correlated_variables = strongly_correlated(dataset = testset_temp, threshold = 0.75)
+# exclude strongly correlated variables
+trainset_cor <- trainset
+trainset_cor[,strongly_correlated_variables] <- NULL
+rm(ls = trainset_temp)
+rm(ls = strongly_correlated_variables)
+rm(ls = strongly_correlated)
+
+
+
+
+
+
 
 
 
