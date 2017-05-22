@@ -12,10 +12,10 @@ AUTHOR: Hamayun Khan
 GetYourGuide
   Goal: Suggest a set of features that will help predict Revenue per Click (RPC)
 
-  0. Load Data
+  # 0. Load Data
 
 ```{r}
-train = read.csv("train.csv")
+training = read.csv("train.csv")
 library(caret)
 library(doParallel)
 library(stringr)
@@ -25,23 +25,25 @@ if(!require("tikzDevice")) install.packages("tikzDevice"); library("tikzDevice")
 require(tikzDevice)
 source("1.0 Helper.R")
 source("3.0 Main.R")
+if(!require("corrplot")) install.packages("corrplot"); library("corrplot") 
 set.seed(123)
 idx_1 = createDataPartition(y = train$Revenue, p = 0.05, list = FALSE)
-train = train[idx_1,]
+train = training[idx_1,]
 train = data_setup(train)
 train = time_features(train)
 
 ```
 
-Contents
-  1. Data Exploration
-  2. Feature Creation
-  3. Feature Selection
-  4. Conclusion 
-  5. Next Steps
+#Contents
+
+  1. Data Exploration  
+  2. Feature Creation  
+  3. Feature Selection  
+  4. Conclusion  
+  5. Next Steps  
   
 
-1. Data Exploration
+##1. Data Exploration
 
 
 ```{r}
@@ -49,11 +51,12 @@ str(train)
 ```
 
 The train set consists of roughly 8.3 million observations of 10 variables, which can be divided into three categories: 
-1.1 Dates
-1.2 Factors 
-1.3 Performance Metrics (not available in the Prediction Set) 
+###1.1 Dates
+###1.2 Factors 
+###1.3 Performance Metrics (not available in the Prediction Set) 
 
-1. We have from 5 months i.e. Dec 2014, Jan-April 2015. In order to better capture the impact of time, we can transform the date variable into weeks, weekdays and months. These are helpful in understanding the differences across the Factors as well as the Performance Metrics. 
+###1.1 Dates
+We have from 5 months i.e. Dec 2014, Jan-April 2015. In order to better capture the impact of time, we can transform the date variable into weeks, weekdays and months. These are helpful in understanding the differences across the Factors as well as the Performance Metrics. 
 
 For instance, the 5th day of the week has the highest average revenue:
 
@@ -63,11 +66,13 @@ ggplot(data = train,
   stat_summary(fun.y = mean, geom = "bar") + labs(x = "Weekday", y = "Revenue (mean)")
 ```
 
-1.2 There are 487,981 unique Keywords, 269,480 unique Ad Groups, 2,927 unique Campaigns and 16 unique Accounts. I marked these variables, along with Devide and Match type, as Factors. (See "3.0 Main.R")
+###1.2 Factors
+There are 487,981 unique Keywords, 269,480 unique Ad Groups, 2,927 unique Campaigns and 16 unique Accounts. I marked these variables, along with Devide and Match type, as Factors. (See "3.0 Main.R")
 While the number of factor levels for Accounts, Device and Match type are relatively low, the others are very high and are likely to be more informative if they are treated (to be discussed later)
 
 
-1.3 Performance metrics include Revenue, Clicks and Conversions which are given. RPC is the target variable and is calculated as Revenue/Clciks. It follows a heavily skewed distribution (around 0), however there are also some very high values.  
+###1.3 Performance Metrics 
+Performance metrics include Revenue, Clicks and Conversions which are given. RPC is the target variable and is calculated as Revenue/Clciks. It follows a heavily skewed distribution (around 0), however there are also some very high values.  
 
 ```{r}
 summary(train$rpc)
@@ -97,7 +102,7 @@ par(mar=c(1,1,1,1))
 ```
 
 ```{r}
-corrplot(cor(train[,-c(1)]), method = "circle")
+corrplot(cor(training[,-c(1)]), method = "circle")
 ```
 
 The corrplot shown above appears to tell us that strong correlations only exist between the various Performance Metrics. 
@@ -107,15 +112,15 @@ There are two points to note here. First, this does not mean that Keywords, or A
 Second, Features that contain information about Revenue, Clicks and Conversions will be important for predicting RPC.
 
 
-Data Exploration: Concluding Thoughts
+###1.4. Data Exploration: Concluding Thoughts
  - Identify time trend in the Data
  - Create features that provide information about Performance Metrics
  - Address high factor levels in Keywords, Ad Groups and Campaigns
 
 
-2. Feature Creation
+##2. Feature Creation
 
-2.1 Time Trend
+###2.1 Time Trend
 
 Month: Month of the Year
 ```{r}
@@ -138,7 +143,7 @@ summary(train$day.of.the.month)
 ```
 
 
-2.2 Performance Metrics
+###2.2 Performance Metrics
 
 I used a simple linear model to predict Clicks, Revenue, Conversions and logistic model Bookings (since its a binary variable). The idea is to create reliable estimates of these variables using a portion for of the Train set (let's call it Train-1) and predict these variables for the remaining Train set (let's call it Train-2) as well as the Prediction set. These estimates can then be used as features for a model trained on Train-2 which predicts our Prediction set.
 
@@ -179,7 +184,7 @@ prediction$Revenue_feature = predict(lr, newdata = prediction)
 
 
 
-2.3 High Factor Levels
+###2.3 High Factor Levels
 
 There are a number of common approaches used to address high factor levels such as Clustering, PCA, Binning. Here I consider Weight of Evidence, which is a supervised (based on the target variable) approach that converts factor variables with high levels into numeric variables.
 
@@ -199,7 +204,7 @@ In this case, we have:
 Ideally, we should compare the new levels to the existing ones and come up with an imputation strategy. However, here I choose to index the new levels and set them to zero as I believe the improvement in predictive power somewhat justifies the loss of information.
 
 
-2.4 Interaction Terms
+###2.4 Interaction Terms
 
 I created 4 interaction terms to capture joint effects of the variables with low factor levels:
 
@@ -208,13 +213,13 @@ I created 4 interaction terms to capture joint effects of the variables with low
 - Match_Device: Capture bookings with particular Match-Device combinations
 - Account_Match_Device: Capture bookings with particular Account-Match-Device Combinations
 
-2.5 Additional Features
+###2.5 Additional Features
 
 Price.paid: Calculates average price paid for a booking by dividing Revenue by Conversions
 Booking: Binary factor that takes value 1 when revenue is greater than 0 and 0 otherwise
 
 
-2.6 Closest Neighbors
+###2.6 Closest Neighbors
 
 Once all other features have been created, we can use KNN to find the distance between bookings and non-bookings.
 The function get_dist is trained on the testset as it will contain all the predicted features.
@@ -224,11 +229,11 @@ testset$dist = get_dist(trainSet = testset, predSet = testset, k = 5)#get distan
 ```
 
 
-3. Feature Selection
+##3. Feature Selection
 
 A number of methods are available for selecting the final set of features. I consider the following two here:
 
-3.1 Variable Importance Plot
+###3.1 Variable Importance Plot
 We can use the variable importance provided by Caret to select the best Features, see below:
 
 ```{r, eval=FALSE}
@@ -250,32 +255,24 @@ stopCluster(cl)
 varImp(ols)
 ```
 
-Print(VarImp)
 
-day.of.the.month30                                            100.00
-day.of.the.month29                                             93.79
-day.of.the.month12                                             86.84
-day.of.the.month23                                             81.22
-weekday5                                                       81.18
-Account_Match_Device341124366337 894413617560 298643508640`    77.50
-day.of.the.month27                                             72.77
-Campaign_ID                                                    64.82
-Account_Device602182847798 298643508640`                       60.32
-Account_Device412971074791 298643508640`                       59.34
-day.of.the.month10                                             58.99
-day.of.the.month26                                             58.59
-Account_Match_Device164144662657 872544605608 298643508640`    58.33
-Account_Device164144662657 298643508640`                       55.70
-day.of.the.month16                                             55.28
-Date                                                           54.85
-Account_Device575525143937 298643508640`                       54.58
-month4                                                         53.50
-month12                                                        53.09
-Account_Match_Device341124366337 872544605608 298643508640`    53.04
+Variable Importance           | Score
+------------------------------|------------------
+day.of.the.month30            |100.00
+day.of.the.month29            | 93.79
+day.of.the.month12            | 86.84
+day.of.the.month23            | 81.22
+weekday5                      | 81.18
+Account_Match_Device          | 77.50
+day.of.the.month27            | 72.77
+Campaign_ID                   | 64.82
+Account_Device602182847798    | 60.32
+Account_Device412971074791    | 59.34
 
 
 
-3.2 Correlation
+
+###3.2 Correlation
 Use the following function to drop new Features that are strongly correlated to each other
 ```{r, eval=FALSE}
 strongly_correlated = function(dataset, threshold = 0.7)
@@ -330,27 +327,33 @@ strongly_correlated = function(dataset, threshold = 0.7)
 ```
 
 
-4. Conclusions
+
+
+##4. Conclusions
 
 - Exploratory Analysis hinted towards an underlying time trend. Looking at variable importance, we can see that the time features are among the best predictors of log.rpc
+- Simple interaction terms capture important relationships even at the Account level
 - Replacing high factor levels with numeric values (using WOE) should make it easier for algorithms to identify the impact of these levels 
 - Further iterations are required optimize the feature creation process, specifically with regards to the ID columns
 
 
-5. Next Steps
+##5. Next Steps
 
 Here are some unfinished ideas I had about the dataset:
 
 
-5.1 Feature Creation
+###5.1 Feature Creation
+
 -  Number of Clicks/Conversions in the last Week, Month
 -  Mean number of Clicks for each Keyword when booked as a proportion of the Total Mean
 -  Percentage Price.Paid deviation in the last Week/Month
 -  Percentage deviation in Conversions in the last Week/Month
 
 
-5.2 Feature Selection
+###5.2 Feature Selection
+
 - Recursive/Stagewise Model building to select best combination of Features
+
 
 
 Thank you for your time!
