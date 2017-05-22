@@ -4,7 +4,7 @@ rm(list = ls())
 
 
 #Load Data
-train = read.csv("~/GetyourGuide/train.csv")
+train_1 = read.csv("~/GetyourGuide/train.csv")
 View(train)
 
 #Load required Packages
@@ -13,6 +13,7 @@ library(doParallel)
 library(stringr)
 library(dplyr)
 if(!require("lubridate")) install.packages("lubridate"); library("lubridate") 
+if(!require("corrplot")) install.packages("corrplot"); library("corrplot") 
 library(zoo)
 
 
@@ -28,7 +29,7 @@ summary(train_subset$rpc)
 
 #Take a stratified sample of the data to create a subset
 set.seed(123)
-idx_1 = createDataPartition(y = train$rpc, p = 0.012, list = FALSE)
+idx_1 = createDataPartition(y = train$rpc, p = 0.005, list = FALSE)
 train = train[idx_1,]
 #rm(train)
 #rm(idx_1)
@@ -110,8 +111,7 @@ ggplot(data = train,
         stat_summary(fun.y = sum, geom = "bar")
 
 #Revenue per Month (mean)
-ggplot(data = train, 
-       aes(year.month, Revenue)) + 
+ggplot(data = train, aes(year.month, Revenue)) + 
         stat_summary(fun.y = mean, geom = "bar") + labs(x = "Month", y = "Revenue (mean)")
 
 #Revenue per DOTM (mean)
@@ -148,20 +148,28 @@ ggplot(data = train,
 #Clicks per Month (mean)  
 ggplot(data = train, 
        aes(year.month, Clicks)) + 
-  stat_summary(fun.y = mean, geom = "bar")
+  stat_summary(fun.y = mean, geom = "bar") + labs(x = "Month", y = "Clicks (mean)")
 
 ##3.0 RPC
 #RPC per Month(sum)
 #RPC per Month(mean)
 
+ggplot(data = train, 
+       aes(year.month, rpc)) + 
+  stat_summary(fun.y = mean, geom = "bar") + labs(x = "Month", y = "rpc (mean)")
 
 ##4.0 Bookings
 ggplot(data = train, 
-       aes(year.month, booking)) + 
+       aes(year.month, as.numeric(booking)-1)) + 
   stat_summary(fun.y = mean, geom = "bar") + labs(x = "Month", y = "Number of Bookings (mean)")
 
 
 ##5.0 Conversions
+ggplot(data = train, 
+       aes(year.month, Conversions)) + 
+  stat_summary(fun.y = mean, geom = "bar") + labs(x = "Month", y = "# of Conversions (mean)")
+
+
 
 
 ggplot(train[which(train$Revenue>0),], aes(x=Revenue)) + geom_histogram()
@@ -169,8 +177,9 @@ ggplot(train, aes(x=log.rpc)) + geom_histogram()
 
 
 
+m = cor(train_subset[,-c(1)])
 
-
+corrplot(cor(train[,-c(1)]), method = "circle")
 
 
 

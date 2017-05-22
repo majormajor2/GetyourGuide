@@ -1,11 +1,3 @@
-library(caret)
-library(doParallel)
-library(stringr)
-library(dplyr)
-if(!require("lubridate")) install.packages("lubridate"); library("lubridate") 
-library(zoo)
-if(!require("tikzDevice")) install.packages("tikzDevice"); library("tikzDevice") 
-require(tikzDevice)
 
 #Define performance measure
 performance_measure = function (data, lev = NULL, model =NULL){
