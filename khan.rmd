@@ -23,14 +23,15 @@ The train set consists of roughly 8.3 million observations of 10 variables, whic
 1.2 Factors 
 1.3 Performance Metrics (not available in the Prediction Set) 
 
-1. We have from 5 months i.e. Dec 2014, Jan-April 2015. In order to better capture the impact of time, we can transform the date variable into weeks, weekdays and months. These are helpful in understanding the differences across the Factors as well as the Performance Metrics. For instance, the 5th day of the week has the highest average revenue.
+1. We have from 5 months i.e. Dec 2014, Jan-April 2015. In order to better capture the impact of time, we can transform the date variable into weeks, weekdays and months. These are helpful in understanding the differences across the Factors as well as the Performance Metrics. 
+
+For instance, the 5th day of the week has the highest average revenue:
 
 ```{r}
 ggplot(data = train, 
        aes(weekday, Revenue)) + 
   stat_summary(fun.y = mean, geom = "bar") + labs(x = "Weekday", y = "Revenue (mean)")
 ```
-
 
 1.2 There are 487,981 unique Keywords, 269,480 unique Ad Groups, 2,927 unique Campaigns and 16 unique Accounts. I marked these variables, along with Devide and Match type, as Factors. (See "3.0 Main.R")
 While the number of factor levels for Accounts, Device and Match type are relatively low, the others are very high and are likely to be more informative if they are treated (to be discussed later)
@@ -60,60 +61,160 @@ ggplot(data = train,
   stat_summary(fun.y = mean, geom = "bar") + labs(x = "Month", y = "log.rpc (mean)")
 ```
 
+Looking at the two plots, we can see a shift in the distribution. RPC seems to be slowly declining starting in December, whereas log.rpc first increases after December and then declines as we head into April. It's clear from these plots that there is an underlying time trend that needs to be identified in order to get a good forecast for RPC.
+```{r}
+par(mar=c(1,1,1,1)) 
+```
 
-Looking at a correlation plot, we can see that xyz will be important predictors of RPC.
+```{r}
+corrplot(cor(train[,-c(1)]), method = "circle")
+```
 
+The corrplot shown above appears to tell us that strong correlations only exist between the various Performance Metrics. 
 
-Comments:
+There are two points to note here. First, this does not mean that Keywords, or Accounts for instance, have little bearing on RPC. It is quite likely a consquence of having factors with a very high number of levels such that a meaningful relationship becomes difficult to establish. It tells us that we need to address this issue in order to give our model the chance to correctly predict revenue. 
 
-
-
-
-Guiding Principles
-
-- a
-- b
-- c
-
-
-Comments:
+Second, Features that contain information about Revenue, Clicks and Conversions will be important for predicting RPC.
 
 
-Feature Creation
-
-- a
-- b
-- c
-
-
-Comments:
+Data Exploration: Concluding Thoughts
+ - Identify time trend in the Data
+ - Create features that provide information about Performance Metrics
+ - Address high factor levels in Keywords, Ad Groups and Campaigns
 
 
-Feature Selection
+
+2. Feature Creation
+
+2.1 Time Trend
+
+Month: Month of the Year
+```{r}
+summary(train$month)
+```
+
+Year-Month: Created primarily to help visualize the time trend
+```{r}
+summary(train$year.month)
+```
+
+Weekday: Maps the week from 1-7
+```{r}
+summary(train$weekday)
+```
+
+Day.of.the.Month: Maps the month from 1-31
+```{r}
+summary(train$day.of.the.month)
+```
 
 
-Data Exploration
+2.2 Performance Metrics
 
-- a
-- b
-- c
+I used a linear model to predict Clicks, Revenue, Conversions and Bookings. The idea is to create reliable estimates of these variables using a portion for of the Train set (let's call it Train-1) and predict these variables for the remaining Train set (let's call it Train-2) as well as the Prediction set. These estimates can then be used as features for a model trained on Train-2 which predicts our Prediction set.
 
-Comments:
+e.g. see below for a prediction of revenue
 
 
-Conclusion
+First, split into training and test sets
+
+```{r}
+set.seed(124)
+idx_2 = createDataPartition(y = train$rpc, p = 0.5, list = FALSE)
+trainset = train[idx_2,]
+testset = train[-idx_2,]
+```
+
+Remove unwanted columns
+```{r}
+trainset$booking = NULL
+trainset$log.rpc = NULL
+trainset$rpc = NULL
+trainset$Conversions = NULL
+trainset$Clicks = NULL
+```
+
+Enable parallel processing and train the model
+```{r}
+cl <- makeCluster(detectCores()-1)
+registerDoParallel(cl)
+ols = caret::train(Revenue~., method = "lm", data = trainset)
+stopCluster(cl)
+```
+
+Create Feature for testset and Prediction set
+```{r}
+testset$Revenue_feature = predict(ols, newdata = testset)
+prediction$Revenue_feature = predict(ols, newdata = prediction)
+```
 
 
-- a
-- b
-- c
+
+2.3 High Factor Levels
+
+There are a number of common approaches used to address high factor levels such as Clustering, PCA, Binning. Here I consider Weight of Evidence, which is a supervised (based on the target variable) approach that converts factor variables with high levels into numeric variables.
+
+The klaR package can be used to compute the WOE Object based on the Train set and it is then applied to the Prediction set. Before it can be applied, however, we need to ensure the Prediction set does not have any new factor levels. In this case, we have:
+  
+  - 26,189 new levels in Keywords
+  - 17,995 new levels in Ad_Groups
+  - 33 new levels in Campaigns
+
+Ideally, we should compare the new levels to the existing ones and come up with an imputation strategy. However, here I choose to index the new levels and set them to zero as I believe the improvement in predictive power somewhat justifies the loss of information.
 
 
-Next Steps
 
-- a
-- b
-- c
+2.4 Interaction Terms
+
+I created 4 interaction terms to capture joint effects of the variables with low factor levels:
+
+- Account_Device: Capture bookings with particular Account-Device combinations
+- Account_Match: Capture bookings with particular Account-Match combinations
+- Match_Device: Capture bookings with particular Match-Device combinations
+- Account_Match_Device: Capture bookings with particular Account-Match-Device Combinations
+
+2.5 Additional Features
+
+Price.paid: Calculates average price paid for a booking by dividing Revenue by Conversions
+Booking: Binary factor that takes value 1 when revenue is greater than 0 and 0 otherwise
+
+
+2.6 Closest Neighbors
+
+Once all other features have been created, we can use KNN to find the distance between bookings and non-bookings.
+The function get_dist is trained on the testset as it will contain all 
+```{r}
+prediction$dist = get_dist(trainSet = testset, predSet = prediction, k = 5)
+train$dist = get_dist(trainSet = train, predSet = train, k = 5)
+```
+
+
+3. Feature Selection
+
+3.1 Correlation
+
+
+
+
+3.2 Variable Importance Plot
+
+
+4. Conclusion
+
+
+
+
+5. Next Steps
+
+Here are some unfinished ideas I had about the dataset:
+
+
+5.1 Feature Creation
+-  
+- 
+
+5.2 Feature Selection
+- Recursive/Stagewise Model building to select best combination of Features
 
 
 
